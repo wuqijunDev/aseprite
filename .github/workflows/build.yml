@@ -44,11 +44,11 @@ jobs:
     - name: Download missing third‑party headers (libjpeg-turbo)
       shell: bash
       run: |
-        # 使用 sparse checkout 仅获取需要的目录，节省时间和空间
-        git clone --depth=1 --filter=blob:none --sparse https://github.com/aseprite/skia.git skia-src
+        # 直接克隆 m102 分支，仅保留最近一次提交，使用 sparse checkout
+        git clone --depth=1 --filter=blob:none --sparse --branch m102 \
+          https://github.com/aseprite/skia.git skia-src
         cd skia-src
         git sparse-checkout set third_party/externals/libjpeg-turbo
-        git checkout m102
         cd ..
         mkdir -p skia/third_party/externals
         cp -r skia-src/third_party/externals/libjpeg-turbo skia/third_party/externals/
