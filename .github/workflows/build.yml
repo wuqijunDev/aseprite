@@ -4,7 +4,7 @@ on: [push, pull_request]
 
 jobs:
   build:
-    runs-on: windows-latest   # 仅构建 Windows，简化矩阵
+    runs-on: windows-latest
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -17,11 +17,11 @@ jobs:
     - name: Setup MSVC
       uses: ilammy/msvc-dev-cmd@v1
 
-    - name: Download Skia (official)
+    - name: Download Skia (m102)
       shell: bash
       run: |
-        # 使用官方 aseprite/skia 的预编译包（Windows x64）
-        SKIA_URL="https://github.com/aseprite/skia/releases/download/m102-1/skia-m102-1-windows-x64.zip"
+        # 使用正确的 m102 下载链接
+        SKIA_URL="https://github.com/aseprite/skia/releases/download/m102-861e4743af/Skia-Windows-Release-x64.zip"
         echo "Downloading Skia from $SKIA_URL"
         curl -L -f -o skia.zip "$SKIA_URL"
         if [ $? -ne 0 ]; then
@@ -36,7 +36,6 @@ jobs:
     - name: Generate Makefiles (CMake)
       shell: bash
       run: |
-        # Windows 不支持 ccache，直接关闭
         cmake -S . -B build -G Ninja \
           -DCMAKE_BUILD_TYPE=Release \
           -DENABLE_UI=on \
