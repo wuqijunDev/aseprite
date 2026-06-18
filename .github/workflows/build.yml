@@ -17,10 +17,9 @@ jobs:
     - name: Setup MSVC
       uses: ilammy/msvc-dev-cmd@v1
 
-    - name: Download Skia (m102)
+    - name: Download Skia (official)
       shell: bash
       run: |
-        # 使用正确的 m102 下载链接
         SKIA_URL="https://github.com/aseprite/skia/releases/download/m102-861e4743af/Skia-Windows-Release-x64.zip"
         echo "Downloading Skia from $SKIA_URL"
         curl -L -f -o skia.zip "$SKIA_URL"
@@ -28,22 +27,36 @@ jobs:
           echo "Failed to download Skia"
           exit 1
         fi
-        # 解压到 skia/ 目录
         7z x skia.zip -oskia/ -y
-        # 验证解压后的结构（方便调试）
-        ls -R skia/ | head -20
+        echo "Skia extracted successfully"
+
+    - name: Download missing icudtl.dat
+      shell: bash
+      run: |
+        # 创建目标目录
+        mkdir -p skia/third_party/externals/icu/flutter
+        # 从 aseprite/skia 仓库下载该文件
+        curl -L -o skia/third_party/externals/icu/flutter/icudtl.dat \
+          https://raw.githubusercontent.com/aseprite/skia/m102/third_party/externals/icu/flutter/icudtl.dat
+        if [ $? -ne 0 ]; then
+          echo "Failed to download icudtl.dat"
+          exit 1
+        fi
+        echo "icudtl.dat downloaded"
 
     - name: Generate Makefiles (CMake)
       shell: bash
       run: |
+        # 使用绝对路径
+        SKIA_DIR="${{ github.workspace }}/skia"
         cmake -S . -B build -G Ninja \
           -DCMAKE_BUILD_TYPE=Release \
           -DENABLE_UI=on \
           -DENABLE_CCACHE=off \
           -DLAF_BACKEND=skia \
-          -DSKIA_DIR=./skia \
-          -DSKIA_LIBRARY_DIR=./skia/out/Release-x64 \
-          -DSKIA_LIBRARY=./skia/out/Release-x64/skia.lib
+          -DSKIA_DIR="$SKIA_DIR" \
+          -DSKIA_LIBRARY_DIR="$SKIA_DIR/out/Release-x64" \
+          -DSKIA_LIBRARY="$SKIA_DIR/out/Release-x64/skia.lib"
 
     - name: Compile Aseprite
       shell: bash
