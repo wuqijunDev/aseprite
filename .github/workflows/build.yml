@@ -17,7 +17,7 @@ jobs:
     - name: Setup MSVC
       uses: ilammy/msvc-dev-cmd@v1
 
-    - name: Download Skia (official)
+    - name: Download Skia (precompiled binaries)
       shell: bash
       run: |
         SKIA_URL="https://github.com/aseprite/skia/releases/download/m102-861e4743af/Skia-Windows-Release-x64.zip"
@@ -30,24 +30,34 @@ jobs:
         7z x skia.zip -oskia/ -y
         echo "Skia extracted successfully"
 
-    - name: Download missing icudtl.dat
+    - name: Download missing ICU data file
       shell: bash
       run: |
-        # 创建目标目录
         mkdir -p skia/third_party/externals/icu/flutter
-        # 从 aseprite/skia 仓库下载该文件
         curl -L -o skia/third_party/externals/icu/flutter/icudtl.dat \
           https://raw.githubusercontent.com/aseprite/skia/m102/third_party/externals/icu/flutter/icudtl.dat
         if [ $? -ne 0 ]; then
           echo "Failed to download icudtl.dat"
           exit 1
         fi
-        echo "icudtl.dat downloaded"
+
+    - name: Download missing third‑party headers (libjpeg-turbo)
+      shell: bash
+      run: |
+        # 使用 sparse checkout 仅获取需要的目录，节省时间和空间
+        git clone --depth=1 --filter=blob:none --sparse https://github.com/aseprite/skia.git skia-src
+        cd skia-src
+        git sparse-checkout set third_party/externals/libjpeg-turbo
+        git checkout m102
+        cd ..
+        mkdir -p skia/third_party/externals
+        cp -r skia-src/third_party/externals/libjpeg-turbo skia/third_party/externals/
+        rm -rf skia-src
+        echo "libjpeg-turbo headers copied"
 
     - name: Generate Makefiles (CMake)
       shell: bash
       run: |
-        # 使用绝对路径
         SKIA_DIR="${{ github.workspace }}/skia"
         cmake -S . -B build -G Ninja \
           -DCMAKE_BUILD_TYPE=Release \
