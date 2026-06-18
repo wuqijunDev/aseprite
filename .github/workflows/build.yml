@@ -1,63 +1,60 @@
 name: build
+
 on: [push, pull_request]
+
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest]
-        build_type: [Release]
-        enable_ui: [on]
-        include:
-          - os: windows-latest
-            build_type: Release
-            enable_ui: on
+    runs-on: windows-latest   # 仅构建 Windows，简化矩阵
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v4
       with:
         submodules: 'recursive'
-    - name: ccache
-      uses: hendrikmuhs/ccache-action@v1
-      if: runner.os == 'Linux'
-      with:
-        key: ${{ matrix.os }}-${{ matrix.enable_ui }}
-    - uses: seanmiddleditch/gha-setup-ninja@master
-    - uses: ilammy/msvc-dev-cmd@v1
-      if: runner.os == 'Windows'
-    - name: Install Dependencies
+
+    - name: Setup Ninja
+      uses: seanmiddleditch/gha-setup-ninja@master
+
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Download Skia (official)
       shell: bash
       run: |
-        if [[ "${{ runner.os }}" == "Linux" ]] ; then
-          sudo apt-get update -qq
-          sudo apt-get install -y \
-            libx11-dev libxcursor-dev libxi-dev
+        # 使用官方 aseprite/skia 的预编译包（Windows x64）
+        SKIA_URL="https://github.com/aseprite/skia/releases/download/m102-1/skia-m102-1-windows-x64.zip"
+        echo "Downloading Skia from $SKIA_URL"
+        curl -L -f -o skia.zip "$SKIA_URL"
+        if [ $? -ne 0 ]; then
+          echo "Failed to download Skia"
+          exit 1
         fi
-    - name: Generating Makefiles
+        # 解压到 skia/ 目录
+        7z x skia.zip -oskia/ -y
+        # 验证解压后的结构（方便调试）
+        ls -R skia/ | head -20
+
+    - name: Generate Makefiles (CMake)
       shell: bash
       run: |
-        if [[ "${{ runner.os }}" == "Windows" ]] ; then
-          export enable_ccache=off
-        else
-          export enable_ccache=on
-        fi
-        curl -L https://github.com/blueloveTH/aseprite/releases/download/v0.01/skia.zip --output skia.zip
-        7z x skia.zip
+        # Windows 不支持 ccache，直接关闭
         cmake -S . -B build -G Ninja \
-          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
-          -DENABLE_UI=${{ matrix.enable_ui }} \
-          -DENABLE_CCACHE=$enable_ccache \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DENABLE_UI=on \
+          -DENABLE_CCACHE=off \
           -DLAF_BACKEND=skia \
           -DSKIA_DIR=./skia \
           -DSKIA_LIBRARY_DIR=./skia/out/Release-x64 \
           -DSKIA_LIBRARY=./skia/out/Release-x64/skia.lib
-    - name: Compiling
+
+    - name: Compile Aseprite
       shell: bash
       run: |
         cd build && ninja
-    - uses: actions/upload-artifact@v4
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
       with:
-        name: aseprite
+        name: aseprite-windows
         path: |
-          D:/a/aseprite/aseprite/build/bin/data
-          D:/a/aseprite/aseprite/build/bin/aseprite.exe
+          build/bin/data
+          build/bin/aseprite.exe
